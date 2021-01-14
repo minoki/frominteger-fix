@@ -2,27 +2,38 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 module IntegerToFloat where
 import           Data.Bits
-import           GHC.Base        ((==), (<))
-import           GHC.Exts        (Double (D#), Float (F#), Int (I#),
-                                  int2Double#, int2Float#, word2Int#, (-#))
+import           GHC.Base        ((<), (==))
+import           GHC.Exts        (Double (D#), Double#, Float (F#), Float#,
+                                  Int (I#), int2Double#, int2Float#,
+                                  negateDouble#, negateFloat#, word2Int#, (-#))
 import           GHC.Float       (RealFloat (encodeFloat, floatDigits),
                                   floatDigits, negateDouble, negateFloat,
                                   roundingMode#)
 import           GHC.Num         (negate, (+), (-))
 import           GHC.Num.Integer (Integer (IN, IP, IS), integerLog2#,
-                                  integerToInt, integerSignum#)
+                                  integerSignum#, integerToInt)
 
 integerToFloat :: Integer -> Float
-integerToFloat (IS i)   = F# (int2Float# i)
-integerToFloat i@(IP _) = integerToBinaryFloat' i
-integerToFloat (IN bn)  = negateFloat (integerToBinaryFloat' (IP bn))
-{-# NOINLINE integerToFloat #-}
+integerToFloat i = F# (integerToFloat# i)
+
+integerToFloat# :: Integer -> Float#
+integerToFloat# (IS i)   = int2Float# i
+integerToFloat# i@(IP _) = case integerToBinaryFloat' i of
+                             F# x -> x
+integerToFloat# (IN bn)  = case integerToBinaryFloat' (IP bn) of
+                             F# x -> negateFloat# x
+{-# NOINLINE integerToFloat# #-}
 
 integerToDouble :: Integer -> Double
-integerToDouble (IS i)   = D# (int2Double# i)
-integerToDouble i@(IP _) = integerToBinaryFloat' i
-integerToDouble (IN bn)  = negateDouble (integerToBinaryFloat' (IP bn))
-{-# NOINLINE integerToDouble #-}
+integerToDouble i = D# (integerToDouble# i)
+
+integerToDouble# :: Integer -> Double#
+integerToDouble# (IS i)   = int2Double# i
+integerToDouble# i@(IP _) = case integerToBinaryFloat' i of
+                              D# x -> x
+integerToDouble# (IN bn)  = case integerToBinaryFloat' (IP bn) of
+                              D# x -> negateDouble# x
+{-# NOINLINE integerToDouble# #-}
 
 -- Suitable definition for fromInteger
 integerToBinaryFloat :: RealFloat a => Integer -> a
@@ -31,7 +42,6 @@ integerToBinaryFloat i = case integerSignum# i of
                            1# -> integerToBinaryFloat' i
                            _  {- -1# -} -> negate (integerToBinaryFloat' (negate i))
 
--- Invariant: n > 0
 integerToBinaryFloat' :: RealFloat a
                       => Integer -- ^ Must be @> 0@.
                       -> a
